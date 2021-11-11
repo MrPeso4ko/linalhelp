@@ -114,6 +114,7 @@ def mult(i, x):
 def out():
     global m, n, matrix
     for ind in range(m):
+        print(ind+1, ') ', sep='', end='\t')
         print(*matrix[ind], sep='\t')
 
 
