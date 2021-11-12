@@ -82,6 +82,7 @@ commands = ['m',
             'q',
             's',
             'a',
+            't',
             'undo',
             'frac',
             'float']
@@ -93,7 +94,7 @@ op_history = []
 
 def is_const(command):
     assert command in commands
-    return command not in ['a', 'm', 's']
+    return command not in ['a', 'm', 's', 't']
 
 
 def swap(i, j):
@@ -114,7 +115,7 @@ def mult(i, x):
 def out():
     global m, n, matrix
     for ind in range(m):
-        print(ind+1, ') ', sep='', end='\t')
+        print(ind + 1, ') ', sep='', end='\t')
         print(*matrix[ind], sep='\t')
 
 
@@ -124,10 +125,28 @@ def add(i, j, x):
         matrix[i - 1][ind] += matrix[j - 1][ind] * x
 
 
+def line_gcd(i):
+    global matrix, m, n
+    res = 0
+    for ind in range(n):
+        res = gcd(res, matrix[i - 1][ind])
+    return res
+
+
+def transp():
+    global m, n, matrix
+    tmp = [[] for _ in range(n)]
+    for ind_x in range(m):
+        for ind_y in range(n):
+            tmp[ind_y].append(deepcopy(matrix[ind_x][ind_y]))
+    m, n = n, m
+    matrix = deepcopy(tmp)
+
+
 def main():
     global m, n, matrix
     m, n = map(int, input("MxN->").split())
-    matrix = [list(map(Fraction, input().split())) for _ in range(m)]
+    matrix = [list(map(Fraction, input().replace('−', '-').split())) for _ in range(m)]
     m_history.append(deepcopy(matrix))
     out()
     while True:
@@ -154,6 +173,12 @@ def main():
                     j = int(j)
                     x = Fraction(x)
                     add(i, j, x)
+                elif cmd[0] == 't':
+                    _, = cmd
+                    transp()
+                elif cmd[0] == 'gcd':
+                    _, i = cmd
+                    print("gcd of line {}: {}".format(i, line_gcd(i)))
                 elif cmd[0] == 'undo':
                     _, = cmd
                     if len(op_history) > 0:
