@@ -2,11 +2,33 @@ from math import gcd
 from copy import deepcopy
 
 
+def lcm(a, b):
+    return (a * b) // gcd(a, b)
+
+
+def to_roman(data):
+    ones = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX"]
+    tens = ["", "X", "XX", "XXX", "XL", "L", "LX", "LXX", "LXXX", "XC"]
+    hunds = ["", "C", "CC", "CCC", "CD", "D", "DC", "DCC", "DCCC", "CM"]
+    thous = ["", "M", "MM", "MMM", "MMMM"]
+
+    t = thous[data // 1000]
+    h = hunds[data // 100 % 10]
+    te = tens[data // 10 % 10]
+    o = ones[data % 10]
+
+    return t + h + te + o
+
+
 class Fraction:
     FRAC = 0
     FLOAT = 1
+    TEX = 2
     OUTPUT_MODE = FRAC
     PRECISION = 2
+
+    def is_int(self):
+        return self.q == 1
 
     def __init__(self, s=None):
         self.p = 0
@@ -52,8 +74,12 @@ class Fraction:
         else:
             if Fraction.OUTPUT_MODE == Fraction.FRAC:
                 return "{}/{}".format(self.p, self.q)
-            else:
+            elif Fraction.OUTPUT_MODE == Fraction.FLOAT:
                 return str(round(self.p / self.q, Fraction.PRECISION))
+            elif Fraction.OUTPUT_MODE == Fraction.TEX:
+                return r"\frac{" + str(self.p) + "}{" + str(self.q) + "}"
+            else:
+                assert False
 
     def __mul__(self, other):
         res = Fraction()
@@ -77,15 +103,59 @@ class Fraction:
     def __radd__(self, other):
         return self + other
 
+    def __int__(self):
+        return int(self.p / self.q)
+
+    def __float__(self):
+        return self.p / self.q
+
+    def __lt__(self, other):
+        if type(other) in (int, float):
+            return float(self) < other
+        elif type(other) == Fraction:
+            return self.p * other.q < other.p * self.q
+        else:
+            assert False
+
+    def __gt__(self, other):
+        if type(other) in (int, float):
+            return float(self) > other
+        elif type(other) == Fraction:
+            return self.p * other.q > other.p * self.q
+        else:
+            assert False
+
+    def __le__(self, other):
+        if type(other) in (int, float):
+            return float(self) <= other
+        elif type(other) == Fraction:
+            return self.p * other.q <= other.p * self.q
+        else:
+            assert False
+
+    def __ge__(self, other):
+        if type(other) in (int, float):
+            return float(self) >= other
+        elif type(other) == Fraction:
+            return self.p * other.q >= other.p * self.q
+        else:
+            assert False
+
+    def __neg__(self):
+        return -1 * self
+
 
 commands = ['m',
             'q',
             's',
             'a',
             't',
+            'gcd',
+            'dlcm',
             'undo',
             'frac',
-            'float']
+            'float',
+            'tex']
 m, n = 0, 0
 matrix = []
 m_history = []
@@ -129,7 +199,18 @@ def line_gcd(i):
     global matrix, m, n
     res = 0
     for ind in range(n):
-        res = gcd(res, matrix[i - 1][ind])
+        if matrix[i - 1][ind].is_int():
+            res = gcd(res, int(matrix[i - 1][ind]))
+        else:
+            return -1
+    return res
+
+
+def line_denominator_lcm(i):
+    global n, m, matrix
+    res = 1
+    for ind in range(n):
+        res = lcm(res, matrix[i - 1][ind].q)
     return res
 
 
@@ -143,8 +224,51 @@ def transp():
     matrix = deepcopy(tmp)
 
 
+def out_tex(filename):
+    global m, n, m_history, op_history
+    prev_output_mode = Fraction.OUTPUT_MODE
+    Fraction.OUTPUT_MODE = Fraction.TEX
+    with open(filename, 'w') as fout:
+        for m_ind in range(len(m_history)):
+            mat = m_history[m_ind]
+            print(r"\begin{pmatrix}", file=fout)
+            for ind in range(len(mat)):
+                line = mat[ind]
+                if ind < len(mat) - 1:
+                    print(*line, sep=' & ', end=r' \\ ', file=fout)
+                else:
+                    print(*line, sep=' & ', file=fout)
+            print(r"\end{pmatrix}", file=fout)
+            if m_ind < len(op_history):
+                op = op_history[m_ind]
+                if op[0] == 'a':
+                    _, i, j, x = op
+                    i = int(i)
+                    j = int(j)
+                    x = Fraction(x)
+                    if x > 0:
+                        print(r" {} = {} + {} \cdot {} ".format(to_roman(i), to_roman(i), x, to_roman(j)), file=fout)
+                    else:
+                        print(r" {} = {} - {} \cdot {} ".format(to_roman(i), to_roman(i), -x, to_roman(j)), file=fout)
+                elif op[0] == 'm':
+                    _, i, x = op
+                    i = int(i)
+                    x = Fraction(x)
+                    print(r" {} = {} \cdot {} ".format(to_roman(i), x, to_roman(i)), file=fout)
+                elif op[0] == 't':
+                    _, = op
+                    print(r" \ T \  ", file=fout)
+                elif op[0] == 's':
+                    _, i, j = op
+                    i = int(i)
+                    j = int(j)
+                    print(r" {} \leftrightarrow {} ".format(to_roman(i), to_roman(j)), file=fout)
+                print(r" \longrightarrow ", file=fout)
+    Fraction.OUTPUT_MODE = prev_output_mode
+
+
 def main():
-    global m, n, matrix
+    global m, n, matrix, m_history, op_history
     m, n = map(int, input("MxN->").split())
     matrix = [list(map(Fraction, input().replace('−', '-').split())) for _ in range(m)]
     m_history.append(deepcopy(matrix))
@@ -178,7 +302,16 @@ def main():
                     transp()
                 elif cmd[0] == 'gcd':
                     _, i = cmd
-                    print("gcd of line {}: {}".format(i, line_gcd(i)))
+                    i = int(i)
+                    res = line_gcd(i)
+                    if res != -1:
+                        print("gcd of line {}: {}".format(i, line_gcd(i)))
+                    else:
+                        print("Невозможно посчитать gcd")
+                elif cmd[0] == 'dlcm':
+                    _, i = cmd
+                    i = int(i)
+                    print("denominator lcm of line {}: {}".format(i, line_denominator_lcm(i)))
                 elif cmd[0] == 'undo':
                     _, = cmd
                     if len(op_history) > 0:
@@ -195,6 +328,9 @@ def main():
                     p = int(p)
                     Fraction.OUTPUT_MODE = Fraction.FLOAT
                     Fraction.PRECISION = p
+                elif cmd[0] == 'tex':
+                    _, filename = cmd
+                    out_tex(filename)
             except ValueError:
                 print("Неверно введены аргументы")
             except IndexError:
