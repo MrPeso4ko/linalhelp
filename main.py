@@ -276,7 +276,7 @@ def main():
     while True:
         cmd = input("->")
         cmd = cmd.split()
-        if cmd[0] in commands:
+        if cmd and cmd[0] in commands:
             try:
                 if cmd[0] == 's':
                     _, i, j = cmd
